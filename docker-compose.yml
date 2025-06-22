@@ -1,0 +1,44 @@
+version: "3.9"
+services:
+  vllm:
+    image: ghcr.io/vllm-project/vllm-openai:latest
+    command: >
+      python3 -m vllm.entrypoints.openai.api_server
+      --model TheBloke/Llama-3-13B-Instruct-AWQ
+      --quantization awq
+      --tensor-parallel-size 1
+    environment:
+      - HF_TOKEN=your_huggingface_token_here
+    ports:
+      - "8000:8000"
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+
+  chromadb:
+    image: chromadb/chroma
+    volumes:
+      - ./chroma_storage:/chroma/chroma
+    ports:
+      - "8001:8000"
+
+  streamlit:
+    build: ./streamlit_app
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./chroma_storage:/app/chroma_storage
+    depends_on:
+      - chromadb
+      - vllm
+
+  n8n:
+    image: n8nio/n8n
+    ports:
+      - "5678:5678"
+    volumes:
+      - ~/.n8n:/home/node/.n8n
